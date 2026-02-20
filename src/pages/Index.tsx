@@ -1,8 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FileText, Sparkles, Download, Layout, Camera, Palette, ArrowRight, Check } from 'lucide-react';
+import { FileText, Sparkles, Download, Layout, Camera, Palette, ArrowRight, Check, User, LogOut, Upload, TrendingUp } from 'lucide-react';
 import heroBg from '@/assets/hero-bg.jpg';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthModal from '@/components/auth/AuthModal';
+import ResumeUploader from '@/components/resume/SimpleUploader';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { useState } from 'react';
 
 const features = [
   { icon: Layout, title: '30+ Templates', desc: 'Professional, creative, and bold designs to match your style.' },
@@ -11,6 +16,7 @@ const features = [
   { icon: Camera, title: 'Photo Upload', desc: 'Add a professional profile photo to stand out.' },
   { icon: Palette, title: 'Colorful Designs', desc: 'From minimalist to bold — find your perfect look.' },
   { icon: FileText, title: 'All Details', desc: 'Experience, education, skills, projects, certifications & more.' },
+  { icon: Upload, title: 'Resume Parser', desc: 'Upload existing resume and get ATS-optimized version.' },
 ];
 
 const steps = [
@@ -20,6 +26,13 @@ const steps = [
 ];
 
 export default function Index() {
+  const { user, signOut, loading } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUploader, setShowUploader] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -31,11 +44,34 @@ export default function Index() {
             </div>
             <span className="font-bold text-lg gradient-text">Interactive Resume Builder</span>
           </div>
-          <Link to="/builder">
-            <Button variant="gradient" size="sm" className="gap-1.5">
-              Build Resume <ArrowRight className="w-4 h-4" />
+          <div className="flex gap-3">
+            <Link to="/builder">
+              <Button variant="gradient" size="sm" className="gap-1.5">
+                Build Resume <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Button variant="outline" size="sm" onClick={() => setShowUploader(true)} className="gap-1.5">
+              <Upload className="w-4 h-4" />
+              Upload Resume
             </Button>
-          </Link>
+            {user ? (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <User className="w-4 h-4" />
+                  {user.email?.split('@')[0]}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-1.5">
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setShowAuthModal(true)} className="gap-1.5">
+                <User className="w-4 h-4" />
+                Sign In
+              </Button>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -70,6 +106,10 @@ export default function Index() {
                   Start Building <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
+              <Button variant="outline" size="lg" onClick={() => setShowUploader(true)} className="gap-2 text-base px-8">
+                <Upload className="w-5 h-5" />
+                Upload Resume
+              </Button>
               <a href="#features">
                 <Button variant="outline" size="lg" className="text-base px-8">
                   Learn More
@@ -168,6 +208,26 @@ export default function Index() {
           <p className="text-xs text-muted-foreground">© 2026 All rights reserved.</p>
         </div>
       </footer>
+      
+      {/* Auth Modal */}
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      
+      {/* Resume Uploader Modal */}
+      {showUploader && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Upload & Parse Resume</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowUploader(false)}>
+                <User className="w-4 h-4" />
+              </Button>
+            </div>
+            <ErrorBoundary>
+              <ResumeUploader />
+            </ErrorBoundary>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

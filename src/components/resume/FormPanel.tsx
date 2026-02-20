@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useResume } from '@/contexts/ResumeContext';
 import { Experience, Education, Skill, Project, Certification, Language } from '@/types/resume';
 import { Button } from '@/components/ui/button';
@@ -8,15 +8,132 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { User, Briefcase, GraduationCap, Wrench, FolderOpen, Award, Globe, Paperclip, Sparkles, Camera, Plus, Trash2 } from 'lucide-react';
+import { User, Briefcase, GraduationCap, Wrench, FolderOpen, Award, Globe, Paperclip, Sparkles, Plus, Trash2, CheckCircle, AlertTriangle, TrendingUp, Camera } from 'lucide-react';
 import { generateAISummary, generateExperienceDescription } from '@/utils/aiSummary';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const genId = () => Math.random().toString(36).slice(2, 9);
 
 export default function FormPanel() {
   const { resumeData, setResumeData, updatePersonalInfo } = useResume();
   const [activeTab, setActiveTab] = useState('personal');
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // ATS Scorer Function
+  const calculateATSScore = () => {
+    let score = 0;
+    const maxScore = 100;
+
+    // Personal info scoring (25 points)
+    if (resumeData.personalInfo.fullName && resumeData.personalInfo.fullName.length > 2) score += 5;
+    if (resumeData.personalInfo.email && resumeData.personalInfo.email.includes('@')) score += 5;
+    if (resumeData.personalInfo.phone && resumeData.personalInfo.phone.length >= 10) score += 5;
+    if (resumeData.personalInfo.summary && resumeData.personalInfo.summary.length > 50) score += 10;
+
+    // Experience scoring (25 points)
+    if (resumeData.experiences && resumeData.experiences.length > 0) {
+      score += 10;
+      resumeData.experiences.forEach(exp => {
+        if (exp.description && exp.description.length > 100) score += 3;
+        if (exp.company && exp.position) score += 2;
+      });
+    }
+
+    // Education scoring (20 points)
+    if (resumeData.education && resumeData.education.length > 0) {
+      score += 10;
+      resumeData.education.forEach(edu => {
+        if (edu.degree && edu.institution) score += 2;
+      });
+    }
+
+    // Skills scoring (20 points)
+    if (resumeData.skills && resumeData.skills.length > 0) {
+      score += 10;
+      resumeData.skills.forEach(skill => {
+        if (skill.name && skill.level >= 3) score += 2;
+      });
+    }
+
+    // Projects scoring (10 points)
+    if (resumeData.projects && resumeData.projects.length > 0) {
+      score += 5;
+      resumeData.projects.forEach(proj => {
+        if (proj.name && proj.description) score += 1;
+      });
+    }
+
+    return Math.min(score, maxScore);
+  };
+
+  // Form Validation
+  const validateForm = () => {
+    const errors: string[] = [];
+    
+    // Name validation
+    if (!resumeData.personalInfo.fullName || resumeData.personalInfo.fullName.trim().length < 2) {
+      errors.push('Full name is required (minimum 2 characters)');
+    }
+    
+    if (resumeData.personalInfo.fullName && !/^[a-zA-Z\s]+$/.test(resumeData.personalInfo.fullName)) {
+      errors.push('Full name should only contain letters and spaces');
+    }
+    
+    // Email validation
+    if (!resumeData.personalInfo.email || !resumeData.personalInfo.email.includes('@')) {
+      errors.push('Valid email address is required');
+    }
+    
+    if (resumeData.personalInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resumeData.personalInfo.email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    // Phone validation - exactly 10 digits, no country code, no alphabets
+    if (!resumeData.personalInfo.phone) {
+      errors.push('Phone number is required');
+    } else {
+      // Remove all non-digit characters first
+      const cleanPhone = resumeData.personalInfo.phone.replace(/\D/g, '');
+      
+      if (cleanPhone.length !== 10) {
+        errors.push('Phone number must be exactly 10 digits (no country code)');
+      }
+      
+      if (!/^\d{10}$/.test(cleanPhone)) {
+        errors.push('Phone number should contain only digits (no alphabets or special characters)');
+      }
+      
+      // Check if phone contains any alphabets
+      if (/[a-zA-Z]/.test(resumeData.personalInfo.phone)) {
+        errors.push('Phone number should not contain alphabets');
+      }
+    }
+    
+    // Skills validation
+    if (resumeData.skills.length === 0) {
+      errors.push('At least one skill is required');
+    }
+    
+    // Check if skills have valid names
+    const invalidSkills = resumeData.skills.filter(skill => !skill.name || skill.name.trim().length < 2);
+    if (invalidSkills.length > 0) {
+      errors.push('All skills must have valid names (minimum 2 characters)');
+    }
+    
+    // Summary validation
+    if (!resumeData.personalInfo.summary || resumeData.personalInfo.summary.trim().length < 20) {
+      errors.push('Professional summary is required (minimum 20 characters)');
+    }
+    
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  // Run validation when data changes
+  useEffect(() => {
+    validateForm();
+  }, [resumeData]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -190,6 +307,43 @@ export default function FormPanel() {
           ))}
         </TabsList>
 
+        {/* Validation Errors */}
+        {validationErrors.length > 0 && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="font-semibold mb-1">Please fix the following errors:</div>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                {validationErrors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* ATS Scorer */}
+        <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-xl p-4 border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-blue-600" />
+              <span className="font-semibold text-blue-900">ATS Compatibility Score</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold text-blue-600">{calculateATSScore()}%</span>
+              <span className="text-sm text-muted-foreground">/ 100</span>
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="w-full bg-blue-200 rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${calculateATSScore()}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto pr-1">
           <TabsContent value="personal" className="mt-0 space-y-4">
             {/* Photo Upload */}
@@ -317,9 +471,9 @@ export default function FormPanel() {
                 <motion.div key={skill.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                   className="p-3 rounded-xl border bg-card space-y-2">
                   <div className="flex justify-between items-center">
-                    <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div className="flex-1 grid grid-cols-1 gap-2">
                       <Input value={skill.name} onChange={e => updateSkill(skill.id, 'name', e.target.value)} placeholder="Skill name" />
-                      <Input value={skill.category} onChange={e => updateSkill(skill.id, 'category', e.target.value)} placeholder="Category" />
+                      <Input value={skill.level} onChange={e => updateSkill(skill.id, 'level', e.target.value)} placeholder="Level (1-5)" type="number" min="1" max="5" />
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => removeSkill(skill.id)} className="text-destructive h-8 w-8 ml-2"><Trash2 className="w-4 h-4" /></Button>
                   </div>
@@ -399,23 +553,6 @@ export default function FormPanel() {
             <div>
               <Label>References</Label>
               <Textarea value={resumeData.references} onChange={e => setResumeData(prev => ({ ...prev, references: e.target.value }))} placeholder="Available upon request" rows={3} />
-            </div>
-            <div>
-              <Label>Attachments</Label>
-              <div className="mt-2 space-y-2">
-                {resumeData.attachments.map(a => (
-                  <div key={a.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted">
-                    <Paperclip className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm flex-1 truncate">{a.name}</span>
-                    <Button variant="ghost" size="icon" onClick={() => removeAttachment(a.id)} className="h-6 w-6 text-destructive"><Trash2 className="w-3 h-3" /></Button>
-                  </div>
-                ))}
-                <label className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 cursor-pointer transition-colors">
-                  <Plus className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Attach files</span>
-                  <input type="file" multiple onChange={handleAttachment} className="hidden" />
-                </label>
-              </div>
             </div>
           </TabsContent>
         </div>
