@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useResume } from '@/contexts/ResumeContext';
 import { Experience, Education, Skill, Project, Certification, Language } from '@/types/resume';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,72 @@ export default function FormPanel() {
   const { resumeData, setResumeData, updatePersonalInfo } = useResume();
   const [activeTab, setActiveTab] = useState('personal');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  
+  // Job title autocomplete state
+  const [jobTitleInput, setJobTitleInput] = useState(resumeData.personalInfo.jobTitle || '');
+  const [showJobTitleDropdown, setShowJobTitleDropdown] = useState(false);
+  const [filteredJobTitles, setFilteredJobTitles] = useState<string[]>([]);
+  const jobTitleInputRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Common job titles for autocomplete
+  const commonJobTitles = [
+    'Software Engineer',
+    'Senior Software Engineer',
+    'Full Stack Developer',
+    'Frontend Developer',
+    'Backend Developer',
+    'Data Scientist',
+    'Data Analyst',
+    'Machine Learning Engineer',
+    'Product Manager',
+    'Project Manager',
+    'UX/UI Designer',
+    'Graphic Designer',
+    'Web Designer',
+    'DevOps Engineer',
+    'Cloud Engineer',
+    'Mobile App Developer',
+    'Quality Assurance Engineer',
+    'Business Analyst',
+    'Marketing Manager',
+    'Sales Manager',
+    'Human Resources Manager',
+    'Financial Analyst',
+    'Accountant',
+    'Teacher',
+    'Nurse',
+    'Doctor',
+    'Lawyer',
+    'Architect',
+    'Civil Engineer',
+    'Mechanical Engineer',
+    'Electrical Engineer',
+    'Chemical Engineer',
+    'Biomedical Engineer',
+    'Research Scientist',
+    'Professor',
+    'Consultant',
+    'Entrepreneur',
+    'Freelancer',
+    'Content Writer',
+    'Social Media Manager',
+    'SEO Specialist',
+    'Digital Marketing Manager',
+    'Operations Manager',
+    'Supply Chain Manager',
+    'Logistics Coordinator',
+    'Customer Service Representative',
+    'Technical Support Specialist',
+    'Network Administrator',
+    'Database Administrator',
+    'Security Analyst',
+    'IT Manager',
+    'Chief Technology Officer',
+    'Chief Executive Officer',
+    'Chief Operating Officer',
+    'Chief Financial Officer'
+  ];
 
   // ATS Scorer Function
   const calculateATSScore = () => {
@@ -134,6 +200,58 @@ export default function FormPanel() {
   useEffect(() => {
     validateForm();
   }, [resumeData]);
+
+  // Job title autocomplete handlers
+  const handleJobTitleChange = (value: string) => {
+    console.log('Job title input changed:', value);
+    setJobTitleInput(value);
+    updatePersonalInfo('jobTitle', value);
+    
+    if (value.length > 0) {
+      const filtered = commonJobTitles.filter(title =>
+        title.toLowerCase().includes(value.toLowerCase())
+      );
+      console.log('Filtered job titles:', filtered);
+      setFilteredJobTitles(filtered);
+      setShowJobTitleDropdown(filtered.length > 0);
+      console.log('Show dropdown:', filtered.length > 0);
+    } else {
+      setShowJobTitleDropdown(false);
+      setFilteredJobTitles([]);
+    }
+  };
+
+  const handleJobTitleSelect = (title: string) => {
+    console.log('Job title selected:', title);
+    setJobTitleInput(title);
+    updatePersonalInfo('jobTitle', title);
+    setShowJobTitleDropdown(false);
+    setFilteredJobTitles([]);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        jobTitleInputRef.current &&
+        !jobTitleInputRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowJobTitleDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Update job title input when resume data changes
+  useEffect(() => {
+    setJobTitleInput(resumeData.personalInfo.jobTitle || '');
+  }, [resumeData.personalInfo.jobTitle]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -369,7 +487,42 @@ export default function FormPanel() {
               </div>
               <div className="col-span-2">
                 <Label>Job Title</Label>
-                <Input value={p.jobTitle} onChange={e => updatePersonalInfo('jobTitle', e.target.value)} placeholder="Software Engineer" />
+                <div ref={jobTitleInputRef} className="relative">
+                  <Input 
+                    value={jobTitleInput} 
+                    onChange={e => handleJobTitleChange(e.target.value)} 
+                    placeholder="Software Engineer" 
+                    onFocus={() => {
+                      if (jobTitleInput.length > 0) {
+                        const filtered = commonJobTitles.filter(title =>
+                          title.toLowerCase().includes(jobTitleInput.toLowerCase())
+                        );
+                        setFilteredJobTitles(filtered);
+                        setShowJobTitleDropdown(filtered.length > 0);
+                      }
+                    }}
+                  />
+                  
+                  {/* Autocomplete Dropdown */}
+                  {showJobTitleDropdown && filteredJobTitles.length > 0 && (
+                    <div 
+                      ref={dropdownRef}
+                      className="absolute top-full left-0 right-0 z-[9999] mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                      style={{ zIndex: 9999 }}
+                    >
+                      {filteredJobTitles.map((title, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-100 last:border-b-0"
+                          onClick={() => handleJobTitleSelect(title)}
+                          onMouseDown={(e) => e.preventDefault()}
+                        >
+                          {title}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <Label>Email</Label>
